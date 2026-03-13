@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Realtime Network Expert</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; background: #111; color: #eee; }
+    button { margin-right: .75rem; padding: .6rem 1rem; font-size: 1rem; }
+    .card { border: 1px solid #333; border-radius: 8px; padding: 1rem; margin-top: 1rem; background: #1b1b1b; }
+    .label { color: #a8a8a8; }
+    textarea { width: 100%; min-height: 70px; margin-top: .5rem; }
+  </style>
+</head>
+<body>
+  <h1>Realtime Network Expert</h1>
+  <p>Monitors your selected screen, analyzes visible network troubleshooting context, and gives one recommendation at a time.</p>
+  <button onclick="post('/start')">Start Monitoring</button>
+  <button onclick="post('/stop')">Stop Monitoring</button>
+
+  <div class="card">
+    <div><span class="label">Running:</span> <span id="running">false</span></div>
+    <div><span class="label">Toolset:</span> <span id="toolset">Unknown</span></div>
+    <div><span class="label">Confidence:</span> <span id="confidence">low</span></div>
+    <div><span class="label">Summary:</span></div>
+    <div id="summary">Not started.</div>
+    <div style="margin-top: 1rem;"><span class="label">Current action:</span></div>
+    <div id="action">Click Start Monitoring.</div>
+
+    <h3>Mark result and request NEXT</h3>
+    <textarea id="result" placeholder="Example: Command showed interface is down/down; no errors."></textarea>
+    <button onclick="nextSuggestion()">NEXT</button>
+
+    <h3>Queued follow-up actions</h3>
+    <ul id="queue"></ul>
+  </div>
+
+<script>
+async function post(path, formData = null) {
+  const opts = { method: 'POST' };
+  if (formData) opts.body = formData;
+  await fetch(path, opts);
+  await refresh();
+}
+
+async function refresh() {
+  const resp = await fetch('/state');
+  const data = await resp.json();
+  document.getElementById('running').innerText = data.running;
+  document.getElementById('toolset').innerText = data.current.toolset;
+  document.getElementById('confidence').innerText = data.current.confidence;
+  document.getElementById('summary').innerText = data.current.summary;
+  document.getElementById('action').innerText = data.current.recommended_action;
+
+  const queue = document.getElementById('queue');
+  queue.innerHTML = '';
+  for (const item of data.queued_actions) {
+    const li = document.createElement('li');
+    li.textContent = item;
+    queue.appendChild(li);
+  }
+}
+
+async function nextSuggestion() {
+  const fd = new FormData();
+  fd.append('result_note', document.getElementById('result').value || 'not provided');
+  await post('/next', fd);
+  document.getElementById('result').value = '';
+}
+
+setInterval(refresh, 2000);
+refresh();
+</script>
+</body>
+</html>
